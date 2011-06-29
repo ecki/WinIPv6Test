@@ -14,17 +14,12 @@
 
 int __cdecl main(int argc, char **argv)
 {
-
-    //-----------------------------------------
-    // Declare and initialize variables
     WSADATA wsaData;
     int iResult;
     INT iRetval;
 
     DWORD dwRetval;
 
-    int i = 1;
-    
     struct addrinfo *result = NULL;
     struct addrinfo *ptr = NULL;
     struct addrinfo hints;
@@ -36,15 +31,14 @@ int __cdecl main(int argc, char **argv)
     char ipstringbuffer[46];
     DWORD ipbufferlength = 46;
 
-	int expected_length = 0;
 
     // Validate the parameters
-    if (argc != 3) {
-        printf("usage: %s <hostname> <servicename>\n", argv[0]);
+    if (argc < 2) {
+        printf("usage: %s <hostname>\n", argv[0]);
         printf("getaddrinfo provides protocol-independent translation\n");
         printf("   from an ANSI host name to an IP address\n");
         printf("%s example usage\n", argv[0]);
-        printf("   %s www.contoso.com 0\n", argv[0]);
+        printf("   %s www.heise.de\n", argv[0]);
         return 1;
     }
 
@@ -57,7 +51,6 @@ int __cdecl main(int argc, char **argv)
 
     //--------------------------------
     // Setup the hints address info structure
-    // which is passed to the getaddrinfo() function
     ZeroMemory( &hints, sizeof(hints) );
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
@@ -66,24 +59,20 @@ int __cdecl main(int argc, char **argv)
 
     printf("Calling getaddrinfo with following parameters:\n");
     printf("\tnodename = %s\n", argv[1]);
-    printf("\tservname (or port) = %s\n", argv[2]);
 	printf("\tflags    = 0x%04x\n\n", hints.ai_flags);
     
-//--------------------------------
-// Call getaddrinfo(). If the call succeeds,
-// the result variable will hold a linked list
-// of addrinfo structures containing response 
-// information
-    dwRetval = getaddrinfo(argv[1], argv[2], &hints, &result);
+	// Call getaddrinfo().
+    dwRetval = getaddrinfo(argv[1], NULL, &hints, &result);
     if ( dwRetval != 0 ) {
         printf("getaddrinfo failed with error: %d\n", dwRetval);
-        WSACleanup();
-        return 1;
+		goto error_out;
     }
 
     printf("getaddrinfo returned success\n");
     
     // Retrieve each address and print out the hex bytes
+	int expected_length = 0;
+    int i = 1;
     for(ptr=result; ptr != NULL ;ptr=ptr->ai_next) {
 
         printf("getaddrinfo response %d\n", i++);
@@ -91,16 +80,17 @@ int __cdecl main(int argc, char **argv)
         printf("\tAddress: ");
         switch (ptr->ai_family) {
             case AF_UNSPEC:
-                printf("Unspecified\n");
+                printf("Unspecified (addrlene=%d)\n", ptr->ai_addrlen);
                 break;
             case AF_INET:
 				expected_length = 16;
                 sockaddr_ipv4 = (struct sockaddr_in *) ptr->ai_addr;
-                printf("AF_INET (IPv4) %s:%d\n",
-					inet_ntoa(sockaddr_ipv4->sin_addr), ntohs(sockaddr_ipv4->sin_port));
+                printf("AF_INET (IPv4) %s\n",
+					inet_ntoa(sockaddr_ipv4->sin_addr)); // ntohs(sockaddr_ipv4->sin_port);
+				if (ptr->ai_addrlen != 16)
+					printf("Warning: unexpected addrlen=%d\n", ptr->ai_addrlen);
                 break;
             case AF_INET6:
-				expected_length = 28;
                 // the InetNtop function is available on Windows Vista and later
                 // sockaddr_ipv6 = (struct sockaddr_in6 *) ptr->ai_addr;
                 // printf("\tIPv6 address %s\n",
@@ -117,55 +107,17 @@ int __cdecl main(int argc, char **argv)
                     printf("WSAAddressToString failed with %u\n", WSAGetLastError() );
                 else    
                     printf("AF_INET6 (IPv6) %s\n", ipstringbuffer);
+				if (ptr->ai_addrlen != 28)
+					printf("Warning: unexpected addrlen=%d\n", ptr->ai_addrlen);
                 break;
             case AF_NETBIOS:
-                printf("AF_NETBIOS (NetBIOS)\n");
+                printf("AF_NETBIOS (NetBIOS) (addrlen=%d)\n", ptr->ai_addrlen);
                 break;
             default:
-                printf("Other %ld\n", ptr->ai_family);
+                printf("Other %ld (addrlen=%d)\n", ptr->ai_family, ptr->ai_addrlen);
                 break;
         }
-        printf("\tSocket type: ");
-        switch (ptr->ai_socktype) {
-            case 0:
-                printf("Unspecified");
-                break;
-            case SOCK_STREAM:
-                printf("SOCK_STREAM (stream)");
-                break;
-            case SOCK_DGRAM:
-                printf("SOCK_DGRAM (datagram)");
-                break;
-            case SOCK_RAW:
-                printf("SOCK_RAW (raw)");
-                break;
-            case SOCK_RDM:
-                printf("SOCK_RDM (reliable message datagram)");
-                break;
-            case SOCK_SEQPACKET:
-                printf("SOCK_SEQPACKET (pseudo-stream packet)");
-                break;
-            default:
-                printf("Other %ld", ptr->ai_socktype);
-                break;
-        }
-        printf("  Protocol: ");
-        switch (ptr->ai_protocol) {
-            case 0:
-                printf("Unspecified\n");
-                break;
-            case IPPROTO_TCP:
-                printf("IPPROTO_TCP (TCP)\n");
-                break;
-            case IPPROTO_UDP:
-                printf("IPPROTO_UDP (UDP) \n");
-                break;
-            default:
-                printf("Other %ld\n", ptr->ai_protocol);
-                break;
-        }
-		if (expected_length != 0 &&  ptr->ai_addrlen != expected_length)
-			printf("\tLength of this sockaddr: %d\n", ptr->ai_addrlen);
+
 		if (ptr->ai_canonname)
 			printf("\tCanonical name: %s\n", ptr->ai_canonname);
     }
@@ -174,4 +126,8 @@ int __cdecl main(int argc, char **argv)
     WSACleanup();
 
     return 0;
+
+error_out:
+    WSACleanup();
+    return 1;
 }
