@@ -1,3 +1,6 @@
+// based on getaddrinfo() sample code from MSDN
+// Modifications: Bernd Eckenfels <bernd-2011@eckenfels.net>
+
 #undef UNICODE
 
 #include "targetver.h"
